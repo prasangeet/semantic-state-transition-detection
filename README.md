@@ -22,61 +22,58 @@ Initial experiments use the [CLEVRER dataset](https://clevrer.csail.mit.edu/), w
 
 ### Download CLEVRER
 
-Run the following commands from the repository root. They download the official CLEVRER videos, training/validation annotations, question JSON files, and optional derender proposals into `data/raw/clevrer/`.
+Run these commands from the repository root. The command block uses shell syntax compatible with Bash and Fish and downloads files into `data/raw/clevrer/`.
 
 Requirements: `wget` and `unzip`.
 
-```bash
-DATA_ROOT="data/raw/clevrer"
-DOWNLOADS="$DATA_ROOT/downloads"
-
-mkdir -p \
-  "$DOWNLOADS" \
-  "$DATA_ROOT/train" \
-  "$DATA_ROOT/validation" \
-  "$DATA_ROOT/test" \
-  "$DATA_ROOT/annotations/train" \
-  "$DATA_ROOT/annotations/validation" \
-  "$DATA_ROOT/questions" \
-  "$DATA_ROOT/derender_proposals"
+```sh
+# Create the required directories
+mkdir -p data/raw/clevrer/downloads
+mkdir -p data/raw/clevrer/train
+mkdir -p data/raw/clevrer/validation
+mkdir -p data/raw/clevrer/test
+mkdir -p data/raw/clevrer/annotations/train
+mkdir -p data/raw/clevrer/annotations/validation
+mkdir -p data/raw/clevrer/questions
+mkdir -p data/raw/clevrer/derender_proposals
 
 # 1. Videos: train, validation, and test
-wget -c -P "$DOWNLOADS" \
+wget -c -P data/raw/clevrer/downloads \
   http://data.csail.mit.edu/clevrer/videos/train/video_train.zip
-wget -c -P "$DOWNLOADS" \
+wget -c -P data/raw/clevrer/downloads \
   http://data.csail.mit.edu/clevrer/videos/validation/video_validation.zip
-wget -c -P "$DOWNLOADS" \
+wget -c -P data/raw/clevrer/downloads \
   http://data.csail.mit.edu/clevrer/videos/test/video_test.zip
 
 # 2. Ground-truth annotations: train and validation
-wget -c -P "$DOWNLOADS" \
+wget -c -P data/raw/clevrer/downloads \
   http://data.csail.mit.edu/clevrer/annotations/train/annotation_train.zip
-wget -c -P "$DOWNLOADS" \
+wget -c -P data/raw/clevrer/downloads \
   http://data.csail.mit.edu/clevrer/annotations/validation/annotation_validation.zip
 
 # 3. Questions: train, validation, and test
-wget -O "$DATA_ROOT/questions/train.json" \
+wget -O data/raw/clevrer/questions/train.json \
   http://data.csail.mit.edu/clevrer/questions/train.json
-wget -O "$DATA_ROOT/questions/validation.json" \
+wget -O data/raw/clevrer/questions/validation.json \
   http://data.csail.mit.edu/clevrer/questions/validation.json
-wget -O "$DATA_ROOT/questions/test.json" \
+wget -O data/raw/clevrer/questions/test.json \
   http://data.csail.mit.edu/clevrer/questions/test.json
 
-# 4. Optional: object derender proposals / attributes
-wget -c -P "$DOWNLOADS" \
+# 4. Optional: object derender proposals
+wget -c -P data/raw/clevrer/downloads \
   http://data.csail.mit.edu/clevrer/derender_proposals.zip
 
 # 5. Extract videos
-unzip -oq "$DOWNLOADS/video_train.zip" -d "$DATA_ROOT/train"
-unzip -oq "$DOWNLOADS/video_validation.zip" -d "$DATA_ROOT/validation"
-unzip -oq "$DOWNLOADS/video_test.zip" -d "$DATA_ROOT/test"
+unzip -oq data/raw/clevrer/downloads/video_train.zip -d data/raw/clevrer/train
+unzip -oq data/raw/clevrer/downloads/video_validation.zip -d data/raw/clevrer/validation
+unzip -oq data/raw/clevrer/downloads/video_test.zip -d data/raw/clevrer/test
 
 # 6. Extract annotations
-unzip -oq "$DOWNLOADS/annotation_train.zip" -d "$DATA_ROOT/annotations/train"
-unzip -oq "$DOWNLOADS/annotation_validation.zip" -d "$DATA_ROOT/annotations/validation"
+unzip -oq data/raw/clevrer/downloads/annotation_train.zip -d data/raw/clevrer/annotations/train
+unzip -oq data/raw/clevrer/downloads/annotation_validation.zip -d data/raw/clevrer/annotations/validation
 
 # 7. Extract optional derender proposals
-unzip -oq "$DOWNLOADS/derender_proposals.zip" -d "$DATA_ROOT/derender_proposals"
+unzip -oq data/raw/clevrer/downloads/derender_proposals.zip -d data/raw/clevrer/derender_proposals
 ```
 
 The downloaded archives are kept in `data/raw/clevrer/downloads/`. Video and annotation archives may contain nested range directories; recursive file discovery is expected.
