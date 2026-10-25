@@ -1,0 +1,117 @@
+# ==============================
+# Python
+# ==============================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+wheels/
+*.egg-info/
+.eggs/
+
+# ==============================
+# Virtual environments
+# ==============================
+.venv/
+venv/
+env/
+ENV/
+
+# ==============================
+# IDEs and editors
+# ==============================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ==============================
+# Environment variables / secrets
+# ==============================
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# ==============================
+# Jupyter
+# ==============================
+.ipynb_checkpoints/
+
+# ==============================
+# Machine learning artifacts
+# ==============================
+*.pth
+*.pt
+*.ckpt
+*.onnx
+*.engine
+*.safetensors
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+*.joblib
+
+# ==============================
+# Training outputs and experiment logs
+# ==============================
+runs/
+outputs/
+checkpoints/
+lightning_logs/
+wandb/
+mlruns/
+logs/
+tensorboard/
+*.log
+
+# ==============================
+# Datasets — CLEVRER
+# ==============================
+data/raw/
+data/interim/
+data/processed/
+data/external/
+
+# Preserve dataset documentation and download instructions
+!data/README.md
+!data/**/README.md
+
+# ==============================
+# Generated visualizations and results
+# ==============================
+results/generated/
+reports/figures/generated/
+*.mp4
+*.avi
+*.mov
+*.webm
+
+# ==============================
+# Temporary files
+# ==============================
+.tmp/
+tmp/
+temp/
+.cache/
+.cache-*/
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Profiling
+# ==============================
+.prof
+.prof.*
+*.prof
+
+# ==============================
+# Optional local configuration
+# ==============================
+config.local.yaml
+config.local.yml
