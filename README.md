@@ -121,29 +121,43 @@ Visual embeddings are projected into the language model's `d_model` dimension an
 
 The decoder implementation supports `google/flan-t5-small` and `google/flan-t5-base`, as well as frozen or selective fine-tuning configurations. The reported V3/V4 experiments use frozen FLAN-T5-Base.
 
-### Backbone choices represented in the model family
+### DINOv2 visual encoder and FLAN-T5 language model architecture
+
+The diagram below shows the end-to-end visual-to-language path used by the reported experiments. DINOv2-Large extracts patch-level visual tokens; the V3/V4 modules add temporal reasoning and produce language-compatible visual embeddings; FLAN-T5-Base consumes those embeddings through its encoder input interface and generates the captions.
 
 ```mermaid
-flowchart TD
-  subgraph Vision["DINOv2 visual encoder family"]
-    DS["DINOv2-Small<br/>384 dimensions<br/>family reference"]
-    DB["DINOv2-Base<br/>768 dimensions<br/>family reference"]
-    DL["DINOv2-Large<br/>1024 dimensions<br/>integrated encoder"]
+flowchart LR
+  subgraph Vision["DINOv2-Large visual encoder"]
+    A["Three ordered RGB frames<br/>Before · During · After"] --> B["Preprocessing<br/>Resize to 224 × 224<br/>ImageNet normalization"]
+    B --> C["Patch embedding<br/>14 × 14 patch size<br/>16 × 16 patch grid"]
+    C --> D["Add CLS and positional embeddings"]
+    D --> E["24 ViT Transformer blocks<br/>hidden dimension = 1024"]
+    E --> F["Per-frame visual tokens<br/>1 CLS + 256 patch tokens<br/>(257 × 1024)"]
   end
-  subgraph Language["FLAN-T5 decoder family"]
-    TS["FLAN-T5-Small<br/>d_model = 512<br/>decoder variant"]
-    TB["FLAN-T5-Base<br/>d_model = 768<br/>reported decoder"]
+
+  subgraph Adapter["OSCaR-Lite temporal reasoning and visual-to-language adapter"]
+    F --> G["Factorized spatiotemporal fusion<br/>4 blocks<br/>Spatial attention within each frame<br/>Temporal attention across frames"]
+    G --> H["V3 readout<br/>Learned visual resampler<br/>32 queries per frame"]
+    G --> I["V4 readout"]
+    I --> I1["State queries<br/>16 queries per frame"]
+    I --> I2["Transition queries<br/>32 queries across all frames"]
+    H --> J["Visual projection<br/>1024 → 768"]
+    I1 --> J
+    I2 --> J
+    J --> K["Visual embeddings<br/>passed through inputs_embeds"]
   end
-  DL --> V3["V3 model"]
-  DL --> V4["V4 model"]
-  TB --> V3
-  TB --> V4
-  TS -. supported decoder alternative .-> V4
-  DS -. requires encoder adaptation .-> V3
-  DB -. requires encoder adaptation .-> V4
+
+  subgraph Language["FLAN-T5-Base language model"]
+    K --> L["T5 encoder<br/>12 Transformer blocks<br/>Self-attention + feed-forward"]
+    L --> M["Contextual encoder representations"]
+    M --> N["T5 decoder<br/>12 Transformer blocks<br/>Masked self-attention<br/>Cross-attention + feed-forward"]
+    N --> O["Autoregressive text generation"]
+    O --> P["Before / During / After<br/>state captions"]
+    O --> Q["Video-level transition caption"]
+  end
 ```
 
-DINOv2-Small/Base and FLAN-T5-Small are documented as supported family variants, not as evaluated experiments here. The performance tables below are for DINOv2-Large and FLAN-T5-Base only.
+**Reported configuration:** `facebook/dinov2-large` (24 layers, 1024-dimensional features, patch size 14) and `google/flan-t5-base` (`d_model = 768`, 12 encoder blocks, 12 decoder blocks). The visual embeddings are supplied to `T5ForConditionalGeneration` with `inputs_embeds`; they are therefore processed by the T5 encoder before the decoder generates caption tokens. FLAN-T5-Base is frozen in the reported V3/V4 experiments. The code also supports FLAN-T5-Small as an alternative, but the reported results use Base.
 
 ## Implemented models
 
