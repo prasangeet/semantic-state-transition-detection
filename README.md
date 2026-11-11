@@ -475,7 +475,9 @@ The visual encoder and FLAN-T5-Base decoder are frozen in the reported experimen
 
 ## Evaluation protocol
 
-V3 and V4 were evaluated on 500 validation samples. Each sample produces four captions, resulting in 2,000 caption-level comparisons per model.
+The repository contains archived validation reports for **V1, V2, V3, and V4.1**. Each report lists 500 validation samples. Since each sample has four caption outputs (before, during, after, and transition), each run contains up to 2,000 caption-level comparisons.
+
+V1 and V2 are legacy model implementations: their historical evaluation artifacts remain available, but the current repository no longer supports their training and evaluation workflows. V3 and V4 are the versions supported by the maintained pipeline.
 
 | Metric | Interpretation |
 |---|---|
@@ -485,33 +487,52 @@ V3 and V4 were evaluated on 500 validation samples. Each sample produces four ca
 | BLEU-4 | Four-gram overlap |
 | ROUGE-L | Longest-common-subsequence based overlap |
 | Semantic similarity | Embedding-based semantic correspondence between generated and reference descriptions |
+| Overall temporal score | Arithmetic mean of semantic alignment for before, during, after, and transition |
 
-A caption is counted as low-similarity when its semantic similarity score is below `0.5`. Automatic metrics are useful for comparison but do not directly guarantee correct object identity, physical validity, or causal correctness.
+A caption is counted as low-similarity when its semantic similarity score is below `0.5`. Low-similarity counts are diagnostic flags for manual inspection, not automatically confirmed factual errors. Automatic metrics also do not directly guarantee correct object identity, physical validity, or causal correctness.
 
 ## Quantitative results
 
-### Overall comparison: V3 vs V4.1
+### Overall comparison: V1 through V4.1
 
-| Metric | V3 | V4.1 | Change |
-|---|---:|---:|---:|
-| Overall temporal score | 0.5660 | **0.6257** | +0.0597 |
-| Low-similarity captions | 715 / 2000 | **462 / 2000** | -253 |
-| Low-similarity rate | 35.75% | **23.10%** | -12.65 percentage points |
+The following summary is taken from the stored `results.json` and `report.md` files for each validation run.
 
-The overall temporal score is the arithmetic mean of the four stage-level semantic-alignment scores (`before`, `during`, `after`, and `transition`) computed on samples with all four valid references. It increased by approximately **10.55% relative** to V3:
+| Model | Report date (UTC) | Validation samples | Overall temporal score | Low-similarity captions | Low-similarity rate |
+|---|---|---:|---:|---:|---:|
+| V1 | 2026-11-08 | 500 | 0.2021 | 1,985 / 2,000 | 99.25% |
+| V2 | 2026-11-09 | 500 | 0.4051 | 1,560 / 2,000 | 78.00% |
+| V3 | 2026-11-10 | 500 | 0.5660 | 715 / 2,000 | 35.75% |
+| V4.1 | 2026-11-11 | 500 | **0.6257** | **462 / 2,000** | **23.10%** |
 
-```python
-absolute_gain = 0.6257 - 0.5660  # 0.0597
-relative_gain_percent = (0.0597 / 0.5660) * 100  # ≈ 10.55%
-```
+The temporal score improves at every version step. The low-similarity caption count also decreases at every step:
 
-The number of low-similarity captions decreased by approximately **35.4%**:
+| Version transition | Temporal-score gain | Relative score gain | Fewer low-similarity captions | Relative reduction in low-similarity captions |
+|---|---:|---:|---:|---:|
+| V1 → V2 | +0.2030 | +100.45% | 425 | 21.41% |
+| V2 → V3 | +0.1609 | +39.72% | 845 | 54.17% |
+| V3 → V4.1 | +0.0597 | +10.55% | 253 | 35.38% |
 
-```python
-reduction_percent = ((715 - 462) / 715) * 100  # ≈ 35.4%
-```
+Across the complete progression, V4.1 gains **0.4236** absolute temporal score over V1 (about **209.60%** relative to V1) and reduces low-similarity captions by **1,523** (about **76.73%**). These are comparisons between successive model versions, not controlled ablations; the table should not be interpreted as isolating the causal contribution of any single architectural component.
 
 ### Stage-wise caption metrics
+
+#### V1
+
+| Stage | BLEU-1 | BLEU-2 | BLEU-3 | BLEU-4 | ROUGE-L | Semantic similarity |
+|---|---:|---:|---:|---:|---:|---:|
+| Before | 0.1184 | 0.0379 | 0.0101 | 0.0032 | 0.1743 | 0.1896 |
+| During | 0.1086 | 0.0396 | 0.0102 | 0.0025 | 0.1670 | 0.1818 |
+| After | 0.1156 | 0.0414 | 0.0106 | 0.0029 | 0.1654 | 0.1806 |
+| Transition | 0.0828 | 0.0317 | 0.0130 | 0.0060 | 0.1473 | 0.2565 |
+
+#### V2
+
+| Stage | BLEU-1 | BLEU-2 | BLEU-3 | BLEU-4 | ROUGE-L | Semantic similarity |
+|---|---:|---:|---:|---:|---:|---:|
+| Before | 0.2651 | 0.0992 | 0.0461 | 0.0219 | 0.2092 | 0.3736 |
+| During | 0.2558 | 0.1032 | 0.0462 | 0.0231 | 0.2134 | 0.3977 |
+| After | 0.2444 | 0.0983 | 0.0460 | 0.0240 | 0.2064 | 0.3884 |
+| Transition | 0.2352 | 0.1013 | 0.0481 | 0.0275 | 0.2227 | 0.4607 |
 
 #### V3
 
@@ -533,37 +554,37 @@ reduction_percent = ((715 - 462) / 715) * 100  # ≈ 35.4%
 
 ### Semantic similarity by stage
 
-| Stage | V3 | V4.1 | Absolute improvement |
-|---|---:|---:|---:|
-| Before | 0.5528 | **0.6167** | +0.0639 |
-| During | 0.5553 | **0.6185** | +0.0632 |
-| After | 0.5548 | **0.6092** | +0.0544 |
-| Transition | 0.6012 | **0.6583** | +0.0571 |
+| Stage | V1 | V2 | V3 | V4.1 |
+|---|---:|---:|---:|---:|
+| Before | 0.1896 | 0.3736 | 0.5528 | **0.6167** |
+| During | 0.1818 | 0.3977 | 0.5553 | **0.6185** |
+| After | 0.1806 | 0.3884 | 0.5548 | **0.6092** |
+| Transition | 0.2565 | 0.4607 | 0.6012 | **0.6583** |
 
-All four stages improved in V4.1. Transition captions had the highest semantic similarity for both models.
+Semantic similarity increases monotonically across V1, V2, V3, and V4.1 for all four output stages. Transition captions have the highest semantic similarity within each version.
 
 ### Low-similarity cases by stage
 
-| Stage | V3 count | V3 rate | V4.1 count | V4.1 rate |
-|---|---:|---:|---:|---:|
-| Before | 205 | 41.0% | 133 | 26.6% |
-| During | 183 | 36.6% | 114 | 22.8% |
-| After | 191 | 38.2% | 122 | 24.4% |
-| Transition | 136 | 27.2% | 93 | 18.6% |
-| **Total** | **715** | **35.75%** | **462** | **23.10%** |
+| Stage | V1 count | V1 rate | V2 count | V2 rate | V3 count | V3 rate | V4.1 count | V4.1 rate |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Before | 496 | 99.2% | 402 | 80.4% | 205 | 41.0% | 133 | 26.6% |
+| During | 498 | 99.6% | 406 | 81.2% | 183 | 36.6% | 114 | 22.8% |
+| After | 497 | 99.4% | 420 | 84.0% | 191 | 38.2% | 122 | 24.4% |
+| Transition | 494 | 98.8% | 332 | 66.4% | 136 | 27.2% | 93 | 18.6% |
+| **Total** | **1,985** | **99.25%** | **1,560** | **78.00%** | **715** | **35.75%** | **462** | **23.10%** |
 
 ### Evaluation plots and reports
 
-Generated evaluation artifacts are stored alongside the reports:
+The archived reports and their associated figures are stored in the repository:
 
-| Artifact | V3 | V4.1 |
-|---|---|---|
-| Stage metrics | [V3 plot](outputs/evaluations/v3_frozen/stage_metrics.png) | [V4 plot](outputs/evaluations/v4/stage_metrics.png) |
-| Temporal alignment | [V3 plot](outputs/evaluations/v3_frozen/temporal_alignment.png) | [V4 plot](outputs/evaluations/v4/temporal_alignment.png) |
-| Prediction/reference browser | [V3 browser](outputs/evaluations/v3_frozen/visual_comparison.html) | [V4 browser](outputs/evaluations/v4/visual_comparison.html) |
-| Full report | [V3 report](outputs/evaluations/v3_frozen/report.md) | [V4 report](outputs/evaluations/v4/report.md) |
+| Artifact | V1 | V2 | V3 | V4.1 |
+|---|---|---|---|---|
+| Stage metrics | [V1 plot](outputs/evaluations/oscar_lite/stage_metrics.png) | [V2 plot](outputs/evaluations/oscar_lite_v2/stage_metrics.png) | [V3 plot](outputs/evaluations/v3_frozen/stage_metrics.png) | [V4.1 plot](outputs/evaluations/v4/stage_metrics.png) |
+| Temporal alignment | [V1 plot](outputs/evaluations/oscar_lite/temporal_alignment.png) | [V2 plot](outputs/evaluations/oscar_lite_v2/temporal_alignment.png) | [V3 plot](outputs/evaluations/v3_frozen/temporal_alignment.png) | [V4.1 plot](outputs/evaluations/v4/temporal_alignment.png) |
+| Full report | [V1 report](outputs/evaluations/oscar_lite/report.md) | [V2 report](outputs/evaluations/oscar_lite_v2/report.md) | [V3 report](outputs/evaluations/v3_frozen/report.md) | [V4.1 report](outputs/evaluations/v4/report.md) |
+| Raw metrics and predictions | [V1 results](outputs/evaluations/oscar_lite/results.json) | [V2 results](outputs/evaluations/oscar_lite_v2/results.json) | [V3 results](outputs/evaluations/v3_frozen/results.json) | [V4.1 results](outputs/evaluations/v4/results.json) |
 
-The HTML visual comparison pages show the three input frames alongside generated and reference captions for the four output categories.
+The V3 and V4.1 directories also include HTML prediction/reference browsers. The V1 and V2 report and JSON artifacts remain available for historical comparison, although the current repository no longer supports rerunning their training/evaluation workflows.
 
 ## Qualitative transition examples
 
