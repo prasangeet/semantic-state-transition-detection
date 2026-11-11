@@ -276,6 +276,49 @@ Although the query memory is frame-local at this stage, its tokens already conta
 | Transition target length | 128 tokens |
 | Dropout | 0.1 |
 
+## Model parameter counts
+
+Parameter counts are reported at two levels because the experiments use cached DINOv2 features during caption training:
+
+1. **Full architecture / inference pipeline** counts the DINOv2 visual backbone, the FLAN-T5 language model, and the version-specific trainable modules.
+2. **Caption-training graph** counts the modules instantiated by the V3/V4 training runner. Since `input_mode="cached_features"`, the DINOv2 encoder is replaced by a parameter-free `CachedFeatureEncoder`; DINOv2 runs separately when features are precomputed.
+
+### Backbone and trainable-module breakdown
+
+| Component | V3 parameters | V4 parameters | Training status |
+|---|---:|---:|---|
+| DINOv2-Large visual backbone | 303,228,928 | 303,228,928 | Frozen; external to cached-feature caption training |
+| FLAN-T5-Base | 247,577,856 | 247,577,856 | Frozen |
+| Factorized spatiotemporal encoder | 101,824,512 | Included in V4 temporal module | Trainable |
+| V3 learned visual resampler | 12,628,992 | — | Trainable |
+| V3 visual projection | 789,248 | — | Trainable |
+| V4 hierarchical temporal/query module | — | 168,023,040 | Trainable |
+| V4 visual projection | — | 789,248 | Trainable |
+| V4 305-class object head | — | 683,313 | Trainable |
+| **Version-specific trainable modules** | **115,242,752** | **169,495,601** | **Trainable** |
+
+The V4 temporal/query module includes the four factorized spatiotemporal blocks, learned frame embeddings, frame-local state queries, video-level transition queries, and the two query cross-attention blocks on each path.
+
+### Total parameter comparison
+
+| Model | Full architecture / inference pipeline | Caption-training graph with cached features | Trainable during caption training | Frozen in caption-training graph |
+|---|---:|---:|---:|---:|
+| **V3** | **666,049,536 (~666.05M)** | 362,820,608 (~362.82M) | 115,242,752 (~115.24M) | 247,577,856 (~247.58M) |
+| **V4** | **720,302,385 (~720.30M)** | 417,073,457 (~417.07M) | 169,495,601 (~169.50M) | 247,577,856 (~247.58M) |
+
+```python
+# Counts in the cached-feature caption-training graph
+total_parameters = sum(p.numel() for p in model.parameters())
+trainable_parameters = sum(
+    p.numel() for p in model.parameters() if p.requires_grad
+)
+frozen_parameters = total_parameters - trainable_parameters
+```
+
+**Interpretation:** V4 adds approximately 54.25M trainable parameters relative to V3. Most of this increase comes from V4's separate state-query and transition-query pathways. The counts exclude tokenizer vocabulary objects, optimizer state, gradients, and the dataset/feature cache itself.
+
+**Counting note:** the version-specific module totals are calculated from the configured dimensions in the repository (1024 hidden units, four spatiotemporal blocks, 16 heads, and the configured query/class counts). DINOv2-Large is counted using the Hugging Face `Dinov2Model` topology/configuration (24 layers, hidden size 1024, LayerScale and mask-token embeddings); FLAN-T5-Base uses 247,577,856 parameters. The DINOv2 count is therefore tied to the Transformers model implementation/configuration and may differ slightly with a different checkpoint implementation. See the [DINOv2 model config](https://huggingface.co/facebook/dinov2-large/blob/main/config.json), [Transformers DINOv2 implementation](https://github.com/huggingface/transformers/blob/main/src/transformers/models/dinov2/modeling_dinov2.py), and [FLAN-T5-Base checkpoint](https://huggingface.co/google/flan-t5-base).
+
 ## Mathematical formulation
 
 The expressions below use code-style notation for convenient copying into implementation notes.
@@ -574,6 +617,41 @@ The paper also reports human preference results: OSCaR received 73.93% favorable
 
 The project does not claim to introduce object-state-change understanding or to outperform the original OSCaR system. Its investigation is architectural: it compares factorized temporal fusion (V3) with a hierarchical representation that separates frame-level state-query decoding from video-level transition-query decoding (V4). The V3-to-V4 improvement is internal to this project and uses its own evaluation pipeline.
 
+## Novelty and research contribution
+
+### Scope of the novelty claim
+
+The project does **not** claim to introduce object-state captioning, state-change understanding, the OSCaR dataset, or the before/during/after plus transition-caption task. Nguyen et al. already introduced that task and benchmark in OSCaR. VidOSC (Xue et al., CVPR 2024) is also related work on object-state changes in videos, focusing on recognition/detection of initial, transitioning, and end states, including open-world settings.
+
+The contribution of this repository is the **task-specific model architecture and its empirical investigation**: how to construct separate frame-level state representations and a sequence-level transition representation from a shared spatiotemporally contextualized visual-token sequence.
+
+### Main architectural contributions
+
+| Contribution | Implementation in this project | Research role |
+|---|---|---|
+| Factorized spatiotemporal token fusion (V3/V4) | Spatial attention mixes visual tokens within each frame; temporal attention then relates the same token slot across the ordered frames. The patch-token grid is retained instead of being immediately collapsed into one global vector. | Builds frame-aligned visual features that carry temporal context. |
+| Hierarchical dual-query readout (V4) | A bank of 16 state queries is applied separately to each frame's temporally contextualized memory; a distinct bank of 32 transition queries reads the joint memory from all three frames. | Separates local state-description evidence from clip-level transition evidence. |
+| Shared vision-to-language interface | Both readout paths are projected from 1024 to 768 dimensions and condition the same frozen FLAN-T5-Base decoder. | Keeps the language-generation backbone consistent while changing the visual representation supplied to it. |
+| Auxiliary object-category supervision (V4) | The mean-pooled transition-query representation is supervised by a 305-class object head, with object loss weight 0.05. | Adds an object-identity learning signal alongside state and transition generation. |
+| V3-to-V4 empirical comparison | Both versions are evaluated on 500 validation samples with the same four output stages and the same metrics. | Measures the effect of evolving from shared per-frame resampling to separate state/transition query paths plus object supervision. |
+
+### Central novelty statement
+
+> **OSCaR-Lite V4 investigates a multi-granularity visual readout for object-state understanding: frame-local learned queries generate before/during/after state descriptions, while a separate video-level query bank generates a transition description from the joint temporal memory. An auxiliary object-classification objective supplies an additional semantic identity signal to the video-level representation.**
+
+### Empirical evidence and its limits
+
+On the current 500-sample validation evaluation, V4 increases the overall temporal score from 0.5660 to 0.6257 (+0.0597 absolute, approximately 10.55% relative) and reduces captions below the 0.5 semantic-similarity threshold from 715 to 462 (approximately 35.4% fewer). This is evidence that the complete V4 configuration performs better than the V3 configuration in this experiment.
+
+However, V4 changes several components together: the state/transition readout design, the query modules, and the auxiliary object-classification objective. There is not yet a controlled ablation that isolates each component's individual contribution. The results therefore support the **combined architecture**, not a causal claim that any one component alone produced the gain.
+
+### Novelty boundary
+
+- **Not claimed:** a new dataset, a new object-state-change task, the first use of temporal attention, the first use of learned queries, or state-of-the-art performance against OSCaR/VidOSC.
+- **Claimed:** a concrete dual-granularity state/transition architecture for free-form multi-stage caption generation, plus an auxiliary object-supervision branch and a V3/V4 comparison on the OSCaR setup.
+- **Still needed to strengthen the claim:** component-wise ablations (remove state queries, remove transition queries, remove object loss), multi-seed evaluation, an open-world evaluation, and human assessment.
+
+
 ## Limitations
 
 1. **Three-frame temporal sampling.** Events with important intermediate steps, long duration, or delayed effects may be missed.
@@ -730,6 +808,7 @@ uv run pytest
 6. Grauman, K. et al. (2022). **Ego4D: Around the World in 3,000 Hours of Egocentric Video.** CVPR 2022. [Project website](https://ego4d-data.org/) · [CVF paper](https://openaccess.thecvf.com/content/CVPR2022/html/Grauman_Ego4D_Around_the_World_in_3000_Hours_of_Egocentric_Video_CVPR_2022_paper.html).
 7. Papineni, K., Roukos, S., Ward, T., & Zhu, W.-J. (2002). **BLEU: a Method for Automatic Evaluation of Machine Translation.** ACL 2002. [ACL Anthology](https://aclanthology.org/P02-1040/).
 8. Lin, C.-Y. (2004). **ROUGE: A Package for Automatic Evaluation of Summaries.** ACL 2004. [ACL Anthology](https://aclanthology.org/W04-1013/).
+9. Xue, Z., Ashutosh, K., & Grauman, K. (2024). **Learning Object State Changes in Videos: An Open-World Perspective.** CVPR 2024, pp. 18493–18503. [Paper](https://openaccess.thecvf.com/content/CVPR2024/html/Xue_Learning_Object_State_Changes_in_Videos_An_Open-World_Perspective_CVPR_2024_paper.html) · [VidOSC code and dataset](https://github.com/facebookresearch/VidOSC).
 
 ## Acknowledgements
 
