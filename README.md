@@ -5,16 +5,34 @@
 **OSCaR-Lite: Structured State Captioning and Semantic Transition Generation from Video**
 
 **Instructor:** Prof. Deepak Mishra  
-**Student:** Prasangeet Dongre (B23CH1033)
+**Team:** Vision Bears
+
+**Team members:**
+- [Prasangeet Dongre](https://github.com/prasangeet) — B23CH1033
+- [Mayuri R. Pujari](https://github.com/Mayu-infinite) — B23ES1026
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.11%2B-ee4c2c.svg)](https://pytorch.org/) [![Dataset](https://img.shields.io/badge/Dataset-OSCaR-8A2BE2.svg)](https://huggingface.co/datasets/ali-vosoughi/oscar-dataset)
 
 A research implementation for understanding what an object looks like, how its state evolves, and what semantic transition occurs across a short video sequence. Given three temporally ordered frames, the system generates descriptions for the before, during, and after stages, together with a video-level transition caption.
 
+## Team and contributions
+
+**Team Vision Bears** consists of two members who contributed equally to the project. The work is divided into complementary responsibilities, with **50% contribution from each member**.
+
+| Team member | Roll number | Contribution |
+|---|---|---|
+| [Prasangeet Dongre](https://github.com/prasangeet) | B23CH1033 | **Model architecture and engineering:** design and implementation of the OSCaR-Lite model versions; DINOv2 and FLAN-T5 integration; temporal-fusion and query-based visual modules; training and evaluation pipeline development; model parameter analysis; experiment execution and reproducibility. |
+| [Mayuri R. Pujari](https://github.com/Mayu-infinite) | B23ES1026 | **Research and experimental analysis:** literature review and task formulation; OSCaR dataset exploration and preparation; preprocessing and experiment planning; validation of model outputs; qualitative error analysis; metric consolidation and result visualization; research documentation and presentation. |
+
+**Contribution share:** Prasangeet Dongre — **50%** · Mayuri R. Pujari — **50%**.
+
+Both members collaborated on refining the problem formulation, reviewing experimental findings, and preparing the final course-project submission.
+
 The repository retains four OSCaR-Lite model versions (V1–V4). **V1 and V2 are legacy model implementations:** their architecture definitions and archived validation results remain in the repository, but the current repository no longer supports their training and evaluation workflows. The maintained training/evaluation pipeline is for **V3 and V4**.
 
 ## Table of contents
 
+- [Team and contributions](#team-and-contributions)
 - [Motivation and task](#motivation-and-task)
 - [Dataset](#dataset)
 - [Backbone families](#backbone-families)
