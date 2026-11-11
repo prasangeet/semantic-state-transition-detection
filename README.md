@@ -1,6 +1,11 @@
-# Semantic Object State Transition Detection
+# CSL7360: Computer Vision
+
+## Semantic Object State Transition Detection
 
 **OSCaR-Lite: Structured State Captioning and Semantic Transition Generation from Video**
+
+**Instructor:** Prof. Deepak Mishra  
+**Student:** Prasangeet Dongre (B23CH1033)
 
 [![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/) [![PyTorch](https://img.shields.io/badge/PyTorch-2.11%2B-ee4c2c.svg)](https://pytorch.org/) [![Dataset](https://img.shields.io/badge/Dataset-OSCaR-8A2BE2.svg)](https://huggingface.co/datasets/ali-vosoughi/oscar-dataset)
 
