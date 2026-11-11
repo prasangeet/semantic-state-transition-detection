@@ -301,10 +301,10 @@ The V4 temporal/query module includes the four factorized spatiotemporal blocks,
 
 ### Total parameter comparison
 
-| Model | Full architecture / inference pipeline | Caption-training graph with cached features | Trainable during caption training | Frozen in caption-training graph |
+| Model | Full architecture / inference pipeline | Caption-training graph with cached features | Trainable during caption training | Frozen in caption-training graph | Trainable share of caption-training graph |
 |---|---:|---:|---:|---:|
-| **V3** | **666,049,536 (~666.05M)** | 362,820,608 (~362.82M) | 115,242,752 (~115.24M) | 247,577,856 (~247.58M) |
-| **V4** | **720,302,385 (~720.30M)** | 417,073,457 (~417.07M) | 169,495,601 (~169.50M) | 247,577,856 (~247.58M) |
+| **V3** | **666,049,536 (~666.05M)** | 362,820,608 (~362.82M) | 115,242,752 (~115.24M) | 247,577,856 (~247.58M) | **31.76%** |
+| **V4** | **720,302,385 (~720.30M)** | 417,073,457 (~417.07M) | 169,495,601 (~169.50M) | 247,577,856 (~247.58M) | **40.64%** |
 
 ```python
 # Counts in the cached-feature caption-training graph
