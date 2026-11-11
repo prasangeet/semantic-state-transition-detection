@@ -11,7 +11,7 @@
 
 A research implementation for understanding what an object looks like, how its state evolves, and what semantic transition occurs across a short video sequence. Given three temporally ordered frames, the system generates descriptions for the before, during, and after stages, together with a video-level transition caption.
 
-The repository currently contains implemented **V3 and V4** models. V1 and V2 are intentionally left as placeholders until their source code is added.
+The repository now includes versioned **V1 and V2 architecture components**, alongside the more recent **V3 and V4 model implementations**. V1 includes an `OSCaRLite` wrapper; V2 currently provides its encoder, temporal-fusion, resampling, projection, and language-decoder modules. The quantitative experiments documented here focus on V3 and V4.
 
 ## Table of contents
 
@@ -161,9 +161,87 @@ flowchart LR
 
 ## Implemented models
 
-### V1
+### V1 — compact DINOv2-Small + temporal fusion + learned resampling
 
-### V2
+V1 is the compact baseline architecture. It uses a frozen **DINOv2-Small** image encoder, a lightweight temporal Transformer operating on corresponding spatial-token positions across frames, a frame-wise learned-query resampler, and **FLAN-T5-Small** for language generation.
+
+**Default component configuration from the V1 modules:**
+
+| Component | Configuration |
+|---|---|
+| Visual encoder | Frozen `facebook/dinov2-small`, 384-dimensional features |
+| Input representation | 224 × 224 RGB; 257 tokens per frame (1 CLS + 256 patch tokens) |
+| Temporal fusion | 384 → 256 projection; learned temporal embeddings; 2 Transformer layers; 4 attention heads; 1024-dimensional feed-forward layer |
+| Visual resampler | 8 learned queries per frame; 4-head cross-attention; residual feed-forward refinement |
+| Visual projection | LayerNorm + linear projection, 256 → 512 |
+| Language model | `google/flan-t5-small`, `d_model = 512`; frozen by default |
+
+#### V1 architecture
+
+```mermaid
+flowchart TD
+  A["Three ordered RGB frames<br/>Before · During · After"] --> B["DINOv2-Small<br/>frozen visual encoder"]
+  B --> C["Per-frame visual tokens<br/>257 × 384"]
+  C --> D["Input projection<br/>384 → 256"]
+  D --> E["Add learned temporal embeddings"]
+  E --> F["Temporal Transformer<br/>2 layers · 4 heads<br/>FFN dimension 1024"]
+  F --> G["Temporal fusion per spatial-token position<br/>same patch/CLS position attends across frames"]
+  G --> H["Fused token grid<br/>(B, T, 257, 256)"]
+  H --> I["Frame-wise learned-query resampler<br/>8 queries per frame<br/>cross-attention + FFN"]
+  I --> J["Visual projection<br/>LayerNorm + 256 → 512"]
+  J --> K["Visual embeddings<br/>(B, T, 8, 512)"]
+  K --> L["FLAN-T5-Small<br/>inputs_embeds · d_model 512"]
+  L --> M["Frame-level state captions<br/>each frame encoded separately"]
+  K --> N["Concatenate frame tokens<br/>3 × 8 = 24 visual tokens"]
+  N --> O["FLAN-T5-Small"]
+  O --> P["Video-level transition caption"]
+```
+
+The state-caption path selects one frame's eight projected visual tokens at a time. The transition-caption path supplies the projected tokens from all frames as one temporal visual sequence. The same FLAN-T5 decoder is used for both tasks.
+
+**Input and training modes:** the V1 wrapper accepts either raw RGB frames `(B, T, C, H, W)` or cached DINOv2 features `(B, T, N, D)`. The DINOv2-Small encoder is frozen in its implementation; the FLAN-T5-Small decoder is frozen by default.
+
+### V2 — wider DINOv2-Base features and higher-capacity temporal readout
+
+V2 scales up the compact V1 design. It uses **DINOv2-Base** features, a wider and deeper temporal Transformer, twice as many frame-wise resampling queries, a 768-dimensional visual-language interface, and **FLAN-T5-Base** as its default language model.
+
+**Default component configuration from the V2 modules and model-loader defaults:**
+
+| Component | Configuration |
+|---|---|
+| Visual encoder | DINOv2-Base, 768-dimensional features; Small/Base variants are supported; frozen by default |
+| Input representation | 224 × 224 RGB; 257 tokens per frame (1 CLS + 256 patch tokens) |
+| Temporal fusion | 768 → 512 projection; learned temporal embeddings; 3 Transformer layers; 8 attention heads; GELU; 2048-dimensional feed-forward layer |
+| Visual resampler | 16 learned queries per frame; 8-head cross-attention; residual feed-forward refinement |
+| Visual projection | LayerNorm + linear projection, 512 → 768 |
+| Language model | `google/flan-t5-base`, `d_model = 768`; frozen by default; Small/Base variants supported by the decoder |
+
+#### V2 architecture
+
+```mermaid
+flowchart TD
+  A["Three ordered RGB frames<br/>Before · During · After"] --> B["DINOv2-Base<br/>768-dimensional visual encoder"]
+  B --> C["Per-frame visual tokens<br/>257 × 768"]
+  C --> D["Input projection<br/>768 → 512"]
+  D --> E["Add learned temporal embeddings"]
+  E --> F["Temporal Transformer<br/>3 layers · 8 heads<br/>GELU · FFN dimension 2048"]
+  F --> G["Temporal fusion per spatial-token position<br/>same patch/CLS position attends across frames"]
+  G --> H["Fused token grid<br/>(B, T, 257, 512)"]
+  H --> I["Frame-wise learned-query resampler<br/>16 queries per frame<br/>8-head cross-attention + FFN"]
+  I --> J["Visual projection<br/>LayerNorm + 512 → 768"]
+  J --> K["Visual embeddings<br/>(B, T, 16, 768)"]
+  K --> L["FLAN-T5-Base<br/>inputs_embeds · d_model 768"]
+  L --> M["Frame-level state captions<br/>each frame encoded separately"]
+  K --> N["Concatenate frame tokens<br/>3 × 16 = 48 visual tokens"]
+  N --> O["FLAN-T5-Base"]
+  O --> P["Video-level transition caption"]
+```
+
+As in V1, each frame's state representation is read separately for state captioning, while all frame-wise visual tokens are combined for the transition caption. The V2 resampler independently applies the same learned-query readout to each frame; it does not use the later V4 split between state queries and a dedicated global transition-query bank.
+
+**Input and training modes:** the V2 encoder supports cached features and raw images, supports DINOv2-Small or DINOv2-Base, and freezes the visual backbone by default while allowing fine-tuning. The checked-in V2 captioning configuration selects 768-dimensional cached features and FLAN-T5-Base.
+
+**Implementation status:** V2 currently has version-specific encoder, temporal-fusion, visual-resampler, visual-projection, and FLAN-T5 decoder modules, but the `src/sostd/models/v2/` directory does not yet contain an `oscar_lite.py` model wrapper. In addition, the current legacy V1/V2 branch of `ModelLoader` resolves the model wrapper and several modules through root-level `src.sostd.models.*` import paths, whereas the new component files are stored under versioned `v1/` and `v2/` directories. The diagrams above document the architecture represented by the component code; they should not be read as confirmation that V1/V2 end-to-end loading is already wired and tested.
 
 ### V3 — factorized spatiotemporal fusion
 
@@ -815,7 +893,7 @@ uv run pytest
 - V4 introduces dedicated state and transition query paths and an auxiliary object classification head.
 - The overall temporal score is an aggregate defined by this project's evaluation implementation. It is not a standard metric reported by the original OSCaR paper.
 - Stored evaluation reports and visual comparison files are the primary experiment artifacts.
-- No V1/V2 architecture or performance claims are made.
+- V1 and V2 architecture components are described in the model sections above; no V1/V2 quantitative performance claims are made here because corresponding evaluation results are not reported.
 
 ## References
 
