@@ -85,7 +85,7 @@ Precomputing visual features avoids repeatedly running the frozen visual encoder
 
 ## Backbone families
 
-The codebase supports DINOv2 and FLAN-T5 variants so the visual encoder and language decoder can be configured independently. The experiments reported here use **DINOv2-Large + FLAN-T5-Base**.
+The model family is described using multiple DINOv2 and FLAN-T5 sizes. The current V3/V4 visual-encoder wrappers are **hard-coded to DINOv2-Large**; DINOv2-Small and DINOv2-Base are included below as family/reference configurations, not as selectable options in the current encoder implementation. The FLAN-T5 decoder supports Small and Base variants. All reported experiments use **DINOv2-Large + FLAN-T5-Base**.
 
 ### DINOv2 visual encoders
 
@@ -103,7 +103,7 @@ base_features  = (B, 257, 768)
 large_features = (B, 257, 1024)
 ```
 
-The temporal fusion input dimension must match the selected encoder output dimension.
+The temporal fusion input dimension must match the selected encoder output dimension. In the checked-in V3/V4 encoder wrappers, `MODEL_NAME`, `HIDDEN_SIZE`, and the expected layer count are fixed to DINOv2-Large; using Small or Base requires adapting the encoder wrapper and downstream temporal dimensions.
 
 ### FLAN-T5 language decoders
 
@@ -114,39 +114,37 @@ Visual embeddings are projected into the language model's `d_model` dimension an
 | FLAN-T5-Small | `google/flan-t5-small` | 512 |
 | FLAN-T5-Base | `google/flan-t5-base` | 768 |
 
-The decoder implementation supports a frozen backbone and selective fine-tuning options. The reported V3/V4 experiments use frozen FLAN-T5-Base.
+The decoder implementation supports `google/flan-t5-small` and `google/flan-t5-base`, as well as frozen or selective fine-tuning configurations. The reported V3/V4 experiments use frozen FLAN-T5-Base.
 
 ### Backbone choices represented in the model family
 
 ```mermaid
 flowchart TD
   subgraph Vision["DINOv2 visual encoder family"]
-    DS["DINOv2-Small<br/>384 dimensions"]
-    DB["DINOv2-Base<br/>768 dimensions"]
-    DL["DINOv2-Large<br/>1024 dimensions"]
+    DS["DINOv2-Small<br/>384 dimensions<br/>family reference"]
+    DB["DINOv2-Base<br/>768 dimensions<br/>family reference"]
+    DL["DINOv2-Large<br/>1024 dimensions<br/>integrated encoder"]
   end
-  subgraph Language["FLAN-T5 language decoder family"]
-    TS["FLAN-T5-Small<br/>d_model = 512"]
-    TB["FLAN-T5-Base<br/>d_model = 768"]
+  subgraph Language["FLAN-T5 decoder family"]
+    TS["FLAN-T5-Small<br/>d_model = 512<br/>decoder variant"]
+    TB["FLAN-T5-Base<br/>d_model = 768<br/>reported decoder"]
   end
-  DL --> V3V4["V3 / V4 reported configuration"]
-  TB --> V3V4
-  DS -. alternative encoder .-> V3V4
-  DB -. alternative encoder .-> V3V4
-  TS -. alternative decoder .-> V3V4
+  DL --> V3["V3 model"]
+  DL --> V4["V4 model"]
+  TB --> V3
+  TB --> V4
+  TS -. supported decoder alternative .-> V4
+  DS -. requires encoder adaptation .-> V3
+  DB -. requires encoder adaptation .-> V4
 ```
 
 DINOv2-Small/Base and FLAN-T5-Small are documented as supported family variants, not as evaluated experiments here. The performance tables below are for DINOv2-Large and FLAN-T5-Base only.
 
 ## Implemented models
 
-### V1 — placeholder
+### V1
 
-> Not documented yet. The V1 implementation and experimental configuration will be added when the corresponding source code is available.
-
-### V2 — placeholder
-
-> Not documented yet. The V2 implementation and experimental configuration will be added when the corresponding source code is available.
+### V2
 
 ### V3 — factorized spatiotemporal fusion
 
@@ -160,14 +158,12 @@ flowchart TD
   B --> C["Per-frame tokens<br/>(B, 3, 257, 1024)"]
   C --> D["Input projection<br/>1024 → 1024"]
   D --> E["Learned temporal position embeddings"]
-  E --> F["4 × Factorized SpatioTemporalBlock"]
-  subgraph F["Each factorized block"]
-    direction TB
-    F1["Spatial self-attention<br/>within each frame"] --> F2["Spatial residual + FFN"]
-    F2 --> F3["Temporal self-attention<br/>same token position across frames"]
-    F3 --> F4["Temporal residual + FFN"]
-  end
-  F --> G["Fused token grid<br/>(B, 3, 257, 1024)"]
+  E --> ENCODER_IN["Spatiotemporal encoder<br/>4 repeated blocks"]
+  ENCODER_IN --> F1["Spatial self-attention<br/>within each frame"]
+  F1 --> F2["Spatial residual + FFN"]
+  F2 --> F3["Temporal self-attention<br/>same token position across frames"]
+  F3 --> F4["Temporal residual + FFN"]
+  F4 --> G["Fused token grid<br/>(B, 3, 257, 1024)"]
   G --> H["Visual resampler<br/>32 learned queries per frame"]
   H --> I["Visual projection<br/>1024 → 768"]
   I --> J["Frozen FLAN-T5-Base"]
@@ -221,14 +217,12 @@ flowchart TD
   B --> C["Cached visual features<br/>(B, 3, 257, 1024)"]
   C --> D["Input projection / identity<br/>1024 → 1024"]
   D --> E["Learned frame-position embeddings"]
-  E --> F["4 × Factorized SpatioTemporalBlock"]
-  subgraph F["Shared spatiotemporal encoder"]
-    direction TB
-    F1["Spatial self-attention<br/>tokens within each frame"] --> F2["Spatial FFN + residual"]
-    F2 --> F3["Temporal self-attention<br/>same token index across frames"]
-    F3 --> F4["Temporal FFN + residual"]
-  end
-  F --> G["Frame features<br/>(B, 3, 257, 1024)"]
+  E --> ENCODER_IN["Spatiotemporal encoder<br/>4 repeated blocks"]
+  ENCODER_IN --> F1["Spatial self-attention<br/>tokens within each frame"]
+  F1 --> F2["Spatial FFN + residual"]
+  F2 --> F3["Temporal self-attention<br/>same token index across frames"]
+  F3 --> F4["Temporal FFN + residual"]
+  F4 --> G["Frame features<br/>(B, 3, 257, 1024)"]
   G --> SM["Frame-local memory<br/>(B × 3, 257, 1024)"]
   SQ["Learned state queries<br/>16 per frame"] --> SQB["2 × QueryCrossAttentionBlock"]
   SM --> SQB
@@ -416,7 +410,7 @@ A caption is counted as low-similarity when its semantic similarity score is bel
 | Low-similarity captions | 715 / 2000 | **462 / 2000** | -253 |
 | Low-similarity rate | 35.75% | **23.10%** | -12.65 percentage points |
 
-The overall temporal score increased by approximately **10.55% relative** to V3:
+The overall temporal score is the arithmetic mean of the four stage-level semantic-alignment scores (`before`, `during`, `after`, and `transition`) computed on samples with all four valid references. It increased by approximately **10.55% relative** to V3:
 
 ```python
 absolute_gain = 0.6257 - 0.5660  # 0.0597
@@ -486,6 +480,14 @@ The HTML visual comparison pages show the three input frames alongside generated
 ## Qualitative transition examples
 
 The following examples are copied from the V4 evaluation's prediction/reference browser. They are representative model outputs, not manually corrected captions.
+
+### Input frame triplets
+
+| Event | Before | During | After |
+|---|---|---|---|
+| Drawer opening | ![Drawer before](outputs/evaluations/v4/visual_comparison_assets/sample_0001_before.jpg) | ![Drawer during](outputs/evaluations/v4/visual_comparison_assets/sample_0001_during.jpg) | ![Drawer after](outputs/evaluations/v4/visual_comparison_assets/sample_0001_after.jpg) |
+| Gas control knob | ![Gas before](outputs/evaluations/v4/visual_comparison_assets/sample_0002_before.jpg) | ![Gas during](outputs/evaluations/v4/visual_comparison_assets/sample_0002_during.jpg) | ![Gas after](outputs/evaluations/v4/visual_comparison_assets/sample_0002_after.jpg) |
+| Bottle closing | ![Bottle before](outputs/evaluations/v4/visual_comparison_assets/sample_0003_before.jpg) | ![Bottle during](outputs/evaluations/v4/visual_comparison_assets/sample_0003_during.jpg) | ![Bottle after](outputs/evaluations/v4/visual_comparison_assets/sample_0003_after.jpg) |
 
 ### Example 1 — Opening a drawer
 
@@ -566,7 +568,7 @@ The paper's Table 2 reports these results on its benchmark:
 
 The paper's table uses its own reported BLEU/ROUGE scale and metric setup. These values must **not** be directly ranked against this repository's stage-specific BLEU-1 through BLEU-4 and ROUGE-L values. A defensible numerical comparison requires identical samples, references, tokenization, metric implementations, and aggregation.
 
-The paper also reports human preference results: OSCaR received 73.93% favorable selections and GPT-4V received 82.5% in the study described in the paper. This repository has not conducted an equivalent human study.
+The paper also reports human preference results: OSCaR received 73.93% favorable selections and GPT-4V received 82.5% in the study described in the paper. This repository has not conducted an equivalent human study. The original paper's reported text metrics and human-study percentages are contextual results, not directly comparable to the V3/V4 scores reported above.
 
 ### Positioning
 
@@ -656,46 +658,49 @@ uv sync
 
 ### Dataset and feature preparation
 
-Check the current command-line options:
+The dataset downloader retrieves OSCaR into `data/OSCaR/`. You must first accept the dataset's Hugging Face access conditions. The script optionally reads `HF_TOKEN` from a project-root `.env` file:
 
 ```bash
-uv run python scripts/dataset_download.py --help
-uv run python scripts/precompute_dinov2_features.py --help
+uv run python scripts/dataset_download.py
 ```
 
-The reported configurations expect cached features under:
+The DINOv2-Large feature-precomputation script uses CUDA device `cuda:0` and writes to `data/OSCaR/cached_features_v3_large`:
 
-```text
-data/OSCaR/cached_features_v3_large
+```bash
+uv run python scripts/precompute_dinov2_features.py
 ```
+
+The expected cached feature shape per sample is `(3, 257, 1024)`. The script skips cache files that pass its shape/content validation.
 
 ### Training
 
-The top-level entrypoint exposes `--train` and delegates to the training package:
+The V3/V4 captioning trainer is exposed by `src/sostd/training/captioning_main.py`. Select the corresponding JSON configuration explicitly:
 
 ```bash
-uv run python main.py --train
+# Train V3
+uv run python -m src.sostd.training.captioning_main --config configs/oscar_lite_v3_captioning.json
+
+# Train V4
+uv run python -m src.sostd.training.captioning_main --config configs/oscar_lite_v4_captioning.json
 ```
 
-Confirm the active training configuration path in `src/sostd/training/` before changing experiment settings.
+Add `--resume` to resume from the latest checkpoint, or `--no-resume` to force a fresh run. The V4 trainer builds its object vocabulary from the training split and saves it in the checkpoint directory.
+
+> **Entrypoint note:** `uv run python main.py --train` currently routes to `src/sostd/training/main.py`, which is a dataset-inspection/annotation-statistics routine and explicitly notes that temporal training data construction is not implemented there. Use `src.sostd.training.captioning_main` for V3/V4 captioning training.
 
 ### Evaluation
 
-The repository includes version-specific evaluation scripts:
+Run the version-specific evaluation scripts with their explicit configurations:
 
 ```bash
-uv run python scripts/evaluate_v3.py --help
-uv run python scripts/evaluate.py --help
+# Evaluate V3
+uv run python scripts/evaluate_v3.py --config configs/oscar_lite_v3_evaluation.json
+
+# Evaluate V4
+uv run python scripts/evaluate.py --config configs/oscar_lite_v4_evaluation.json
 ```
 
-Final evaluation configuration files:
-
-```text
-configs/oscar_lite_v3_evaluation.json
-configs/oscar_lite_v4_evaluation.json
-```
-
-Use each script's help output and configuration schema to select the invocation; this README does not invent unverified CLI flags.
+Both scripts write reports and visual-comparison artifacts under `outputs/evaluations/` as configured in the JSON files.
 
 ### Tests
 
