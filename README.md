@@ -11,7 +11,7 @@
 
 A research implementation for understanding what an object looks like, how its state evolves, and what semantic transition occurs across a short video sequence. Given three temporally ordered frames, the system generates descriptions for the before, during, and after stages, together with a video-level transition caption.
 
-The repository retains four OSCaR-Lite model versions (V1–V4). **V1 and V2 are legacy model implementations:** their architecture definitions remain in the source, but the current repository no longer supports their training and evaluation workflows. The maintained training/evaluation pipeline and reported experiments are for **V3 and V4**.
+The repository retains four OSCaR-Lite model versions (V1–V4). **V1 and V2 are legacy model implementations:** their architecture definitions and archived validation results remain in the repository, but the current repository no longer supports their training and evaluation workflows. The maintained training/evaluation pipeline is for **V3 and V4**.
 
 ## Table of contents
 
@@ -161,7 +161,7 @@ flowchart LR
 
 ## Model versions and support status
 
-**V1 and V2 are legacy/reference model implementations.** Their model definitions remain in the repository and are retained as valid earlier OSCaR-Lite architectures. However, the current repository no longer supports training or evaluation workflows for V1 and V2. The maintained training and evaluation pipeline, experiment artifacts, and quantitative comparisons are for **V3 and V4** only.
+**V1 and V2 are legacy/reference model implementations.** Their model definitions and archived validation results remain in the repository. However, the current repository no longer supports training or evaluation workflows for V1 and V2. The maintained training and evaluation pipeline is for **V3 and V4**; the historical V1/V2 results are included in the quantitative comparison below.
 
 The next two sections describe the currently maintained model versions. Parameter-count breakdowns for all four model versions are provided separately below.
 
@@ -856,13 +856,13 @@ uv run pytest
 
 ## Reproducibility notes
 
-- V3 and V4 evaluations each use 500 validation samples.
+- Archived V1, V2, V3, and V4.1 evaluation reports each list 500 validation samples.
 - Each sample yields four captions, giving 2,000 caption-level comparisons per model.
-- Both reported models use DINOv2-Large cached features with 257 tokens and 1024 dimensions per frame.
+- The reported V3 and V4.1 runs use DINOv2-Large cached features with 257 tokens and 1024 dimensions per frame.
 - V4 introduces dedicated state and transition query paths and an auxiliary object classification head.
 - The overall temporal score is an aggregate defined by this project's evaluation implementation. It is not a standard metric reported by the original OSCaR paper.
 - Stored evaluation reports and visual comparison files are the primary experiment artifacts.
-- V1 and V2 are legacy architecture implementations retained in the repository. The current repository does not support their training or evaluation workflows, and no V1/V2 quantitative results are reported here.
+- V1 and V2 are legacy architecture implementations retained in the repository. The current repository does not support rerunning their training or evaluation workflows; their archived quantitative results are summarized above and linked to the original reports and JSON files.
 
 ## References
 
