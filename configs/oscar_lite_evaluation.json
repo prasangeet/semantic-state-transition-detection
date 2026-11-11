@@ -1,0 +1,15 @@
+{
+  "checkpoint": "checkpoints/oscar_lite/best.pt",
+  "output_dir": "outputs/evaluations",
+  "split": "validation",
+  "batch_size": 8,
+  "num_workers": 0,
+  "pin_memory": true,
+  "device": "cuda",
+  "amp": true,
+  "max_state_tokens": 64,
+  "max_transition_tokens": 96,
+  "num_beams": 4,
+  "seed": 42,
+  "limit": null
+}

@@ -1,0 +1,76 @@
+{
+  "version": "v3-frozen",
+  "project": "OSCaR-Lite",
+  "training": {
+    "epochs": 50,
+    "seed": 42,
+    "checkpoint_dir": "checkpoints/oscar_lite_v3_frozen",
+    "resume": false
+  },
+  "data": {
+    "input_mode": "cached_features",
+    "feature_dir": "data/OSCaR/cached_features_v3_large",
+    "expected_feature_dim": 1024,
+    "expected_num_tokens": 257,
+    "batch_size": 8,
+    "num_workers": 4,
+    "persistent_workers": true,
+    "prefetch_factor": 2,
+    "pin_memory": true,
+    "drop_last": false,
+    "max_state_length": 128,
+    "max_transition_length": 128
+  },
+  "model": {
+    "max_frames": 3,
+    "dropout": 0.1,
+    "tokenizer_name": "google/flan-t5-base",
+    "encoder": {
+      "freeze_backbone": true,
+      "unfreeze_last_n_layers": 0,
+      "image_size": 224
+    },
+    "temporal_fusion": {
+      "hidden_dim": 1024,
+      "num_heads": 16,
+      "num_layers": 4
+    },
+    "visual_resampler": {
+      "num_queries": 32
+    },
+    "language_decoder": {
+      "model_name": "google/flan-t5-base",
+      "freeze_backbone": true,
+      "unfreeze_last_n_layers": 0
+    }
+  },
+  "optimizer": {
+    "name": "adamw",
+    "lr": 0.0001,
+    "kwargs": {
+      "weight_decay": 0.0001
+    }
+  },
+  "scheduler": {
+    "name": "plateau",
+    "kwargs": {
+      "mode": "min",
+      "factor": 0.5,
+      "patience": 3,
+      "min_lr": 1e-6
+    }
+  },
+  "early_stopping": {
+    "enabled": true,
+    "patience": 8,
+    "min_delta": 0.0001,
+    "mode": "min"
+  },
+  "engine": {
+    "device": "cuda:0",
+    "amp": true,
+    "grad_clip": 1.0,
+    "state_weight": 1.0,
+    "transition_weight": 1.0
+  }
+}

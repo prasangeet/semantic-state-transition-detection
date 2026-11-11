@@ -1,0 +1,51 @@
+
+{
+  "model_version": "v3",
+  "input_mode": "cached_features",
+  "checkpoint": "checkpoints/oscar_lite_v3_frozen/best.pt",
+  "tokenizer_name": "google/flan-t5-base",
+  "split": "validation",
+  "feature_dir": "data/OSCaR/cached_features_v3_large",
+  "expected_feature_dim": 1024,
+  "expected_num_tokens": 257,
+  "expected_num_frames": 3,
+  "model_config": {
+    "encoder": {
+      "model_name": "facebook/dinov2-large",
+      "freeze_backbone": true,
+      "unfreeze_last_n_layers": 0,
+      "image_size": 224
+    },
+    "temporal_fusion": {
+      "hidden_dim": 1024,
+      "num_heads": 16,
+      "num_layers": 4
+    },
+    "visual_resampler": {
+      "num_queries": 32,
+      "num_heads": 16
+    },
+    "visual_projection": {
+      "input_dim": 1024,
+      "output_dim": 768
+    },
+    "language_decoder": {
+      "model_name": "google/flan-t5-base",
+      "freeze": true
+    }
+  },
+  "output_dir": "outputs/evaluations/v3_frozen_e2",
+  "batch_size": 4,
+  "num_workers": 4,
+  "pin_memory": true,
+  "device": "cuda",
+  "amp": true,
+  "max_state_tokens": 160,
+  "max_transition_tokens": 240,
+  "num_beams": 4,
+  "repetition_penalty": 1.20,
+  "no_repeat_ngram_size": 3,
+  "length_penalty": 1.0,
+  "seed": 42,
+  "limit": null
+}

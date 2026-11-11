@@ -1,0 +1,98 @@
+# ==============================
+# Python
+# ==============================
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+
+.coverage
+.coverage.*
+htmlcov/
+
+# ==============================
+# Virtual environments
+# ==============================
+.venv/
+venv/
+env/
+ENV/
+
+# ==============================
+# Environment variables / secrets
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# Hugging Face caches
+# ==============================
+.cache/
+**/.cache/
+
+# ==============================
+# Datasets
+# ==============================
+/data/
+
+# ==============================
+# Model checkpoints
+# ==============================
+/checkpoints/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+
+# ==============================
+# Generated experiment outputs
+# ==============================
+/runs/
+/logs/
+/tensorboard/
+/wandb/
+
+# ==============================
+# Video files
+# ==============================
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.webm
+
+# ==============================
+# Python packaging
+# ==============================
+build/
+dist/
+*.egg-info/
+
+# ==============================
+# Jupyter
+# ==============================
+.ipynb_checkpoints/
+
+# ==============================
+# IDE / editor
+# ==============================
+.idea/
+.vscode/
+
+# ==============================
+# Operating system
+# ==============================
+.DS_Store
+Thumbs.db
+
+# ==============================
+# Temporary files
+# ==============================
+*.swp
+*.swo
+*~

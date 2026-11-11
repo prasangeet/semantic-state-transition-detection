@@ -1,0 +1,49 @@
+
+{
+  "model": {
+    "tokenizer_name": "google/flan-t5-base"
+  },
+  "data": {
+    "feature_dir": "data/OSCaR/cached_features_v2",
+    "expected_feature_dim": 768,
+    "expected_num_tokens": 257,
+    "batch_size": 8,
+    "num_workers": 0,
+    "pin_memory": true,
+    "max_state_length": 128,
+    "max_transition_length": 128
+  },
+  "optimizer": {
+    "name": "adamw",
+    "lr": 0.00005,
+    "kwargs": {
+      "weight_decay": 0.0001
+    }
+  },
+  "scheduler": {
+    "name": "cosine",
+    "kwargs": {
+      "T_max": 25,
+      "eta_min": 0.000001
+    }
+  },
+  "engine": {
+    "device": "cuda:0",
+    "amp": true,
+    "grad_clip": 1.0,
+    "state_weight": 1.0,
+    "transition_weight": 1.0
+  },
+  "early_stopping": {
+    "enabled": true,
+    "patience": 5,
+    "min_delta": 0.001,
+    "mode": "min"
+  },
+  "training": {
+    "epochs": 50,
+    "checkpoint_dir": "checkpoints/oscar_lite_v2",
+    "resume": false,
+    "seed": 42
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "checkpoint": "checkpoints/oscar_lite_v2/best.pt",
+  "tokenizer_name": "google/flan-t5-base",
+  "split": "validation",
+  "feature_dir": "data/OSCaR/cached_features_v2",
+  "expected_feature_dim": 768,
+  "expected_num_tokens": 257,
+  "output_dir": "outputs/evaluations/oscar_lite_v2",
+  "batch_size": 8,
+  "num_workers": 0,
+  "pin_memory": true,
+  "device": "cuda",
+  "amp": true,
+  "max_state_tokens": 128,
+  "max_transition_tokens": 128,
+  "num_beams": 4,
+  "seed": 42,
+  "limit": null
+}
