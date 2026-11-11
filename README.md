@@ -841,7 +841,7 @@ uv run pytest
 - V4 introduces dedicated state and transition query paths and an auxiliary object classification head.
 - The overall temporal score is an aggregate defined by this project's evaluation implementation. It is not a standard metric reported by the original OSCaR paper.
 - Stored evaluation reports and visual comparison files are the primary experiment artifacts.
-- V1 and V2 architecture components are described in the model sections above; no V1/V2 quantitative performance claims are made here because corresponding evaluation results are not reported.
+- V1 and V2 are legacy architecture implementations retained in the repository. The current repository does not support their training or evaluation workflows, and no V1/V2 quantitative results are reported here.
 
 ## References
 
