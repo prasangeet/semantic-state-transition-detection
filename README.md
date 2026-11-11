@@ -373,6 +373,15 @@ Each model has its own parameter table below. Counts describe the complete raw-f
 | **Frozen modules in caption-training graph** | FLAN-T5-Base | **247,577,856** | **Frozen** |
 | **Frozen modules in full architecture** | DINOv2-Large + FLAN-T5-Base | **551,946,496** | **Frozen** |
 
+## Total parameter comparison
+
+The comparison below covers the currently maintained V3 and V4 caption-training pipelines. Each row is kept on its own line so GitHub renders this as a table rather than a wrapped block of raw Markdown.
+
+| Model | Full architecture | Caption-training graph | Trainable in graph | Frozen in graph | Trainable share |
+|---|---:|---:|---:|---:|---:|
+| V3 | 667,189,248 (667.19M) | 362,820,608 (362.82M) | 115,242,752 (115.24M) | 247,577,856 (247.58M) | 31.76% |
+| V4 | 721,442,097 (721.44M) | 417,073,457 (417.07M) | 169,495,601 (169.50M) | 247,577,856 (247.58M) | 40.64% |
+
 ### Parameter-counting methodology and caveats
 
 - **DINOv2 positional embeddings:** the Hugging Face DINOv2 Small/Base/Large configs use a native 518 × 518 image size with 14 × 14 patches (37 × 37 patch positions). The project encoder resizes runtime frames to 224 × 224 and the model interpolates positional embeddings for that input, but the learned checkpoint position-embedding table remains at its configured size. Parameter totals therefore include that native learned table rather than counting only 257 positions.
