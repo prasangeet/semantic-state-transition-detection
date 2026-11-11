@@ -686,6 +686,8 @@ uv run python -m src.sostd.training.captioning_main --config configs/oscar_lite_
 
 Add `--resume` to resume from the latest checkpoint, or `--no-resume` to force a fresh run. The V4 trainer builds its object vocabulary from the training split and saves it in the checkpoint directory.
 
+> **V3 config compatibility:** the checked-in `configs/oscar_lite_v3_captioning.json` currently declares top-level `version: "v3-frozen"`, but the trainer accepts only `"v3"` and `"v4"`. Before running the V3 command, change that field to `"v3"` (or make the same change in a copy of the config). The V4 config already declares `"v4"`.
+
 > **Entrypoint note:** `uv run python main.py --train` currently routes to `src/sostd/training/main.py`, which is a dataset-inspection/annotation-statistics routine and explicitly notes that temporal training data construction is not implemented there. Use `src.sostd.training.captioning_main` for V3/V4 captioning training.
 
 ### Evaluation
