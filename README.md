@@ -11,14 +11,14 @@
 
 A research implementation for understanding what an object looks like, how its state evolves, and what semantic transition occurs across a short video sequence. Given three temporally ordered frames, the system generates descriptions for the before, during, and after stages, together with a video-level transition caption.
 
-The repository now includes versioned **V1 and V2 architecture components**, alongside the more recent **V3 and V4 model implementations**. V1 includes an `OSCaRLite` wrapper; V2 currently provides its encoder, temporal-fusion, resampling, projection, and language-decoder modules. The quantitative experiments documented here focus on V3 and V4.
+The repository retains four OSCaR-Lite model versions (V1–V4). **V1 and V2 are legacy model implementations:** their architecture definitions remain in the source, but the current repository no longer supports their training and evaluation workflows. The maintained training/evaluation pipeline and reported experiments are for **V3 and V4**.
 
 ## Table of contents
 
 - [Motivation and task](#motivation-and-task)
 - [Dataset](#dataset)
 - [Backbone families](#backbone-families)
-- [Implemented models](#implemented-models)
+- [Model versions and support status](#model-versions-and-support-status)
 - [Mathematical formulation](#mathematical-formulation)
 - [Training setup](#training-setup)
 - [Evaluation protocol](#evaluation-protocol)
@@ -90,7 +90,7 @@ Precomputing visual features avoids repeatedly running the frozen visual encoder
 
 ## Backbone families
 
-The model family is described using multiple DINOv2 and FLAN-T5 sizes. The current V3/V4 visual-encoder wrappers are **hard-coded to DINOv2-Large**; DINOv2-Small and DINOv2-Base are included below as family/reference configurations, not as selectable options in the current encoder implementation. The FLAN-T5 decoder supports Small and Base variants. All reported experiments use **DINOv2-Large + FLAN-T5-Base**.
+The four model versions use different backbone sizes. V1 uses DINOv2-Small; V2 defaults to DINOv2-Base and its encoder module supports Small/Base; V3 and V4 use DINOv2-Large. The language decoders include FLAN-T5-Small and FLAN-T5-Base, with V1 defaulting to Small and V2–V4 defaulting to Base. The reported experiments use **DINOv2-Large + FLAN-T5-Base**.
 
 ### DINOv2 visual encoders
 
@@ -159,89 +159,11 @@ flowchart LR
 
 **Reported configuration:** `facebook/dinov2-large` (24 layers, 1024-dimensional features, patch size 14) and `google/flan-t5-base` (`d_model = 768`, 12 encoder blocks, 12 decoder blocks). The visual embeddings are supplied to `T5ForConditionalGeneration` with `inputs_embeds`; they are therefore processed by the T5 encoder before the decoder generates caption tokens. FLAN-T5-Base is frozen in the reported V3/V4 experiments. The code also supports FLAN-T5-Small as an alternative, but the reported results use Base.
 
-## Implemented models
+## Model versions and support status
 
-### V1 — compact DINOv2-Small + temporal fusion + learned resampling
+**V1 and V2 are legacy/reference model implementations.** Their model definitions remain in the repository and are retained as valid earlier OSCaR-Lite architectures. However, the current repository no longer supports training or evaluation workflows for V1 and V2. The maintained training and evaluation pipeline, experiment artifacts, and quantitative comparisons are for **V3 and V4** only.
 
-V1 is the compact baseline architecture. It uses a frozen **DINOv2-Small** image encoder, a lightweight temporal Transformer operating on corresponding spatial-token positions across frames, a frame-wise learned-query resampler, and **FLAN-T5-Small** for language generation.
-
-**Default component configuration from the V1 modules:**
-
-| Component | Configuration |
-|---|---|
-| Visual encoder | Frozen `facebook/dinov2-small`, 384-dimensional features |
-| Input representation | 224 × 224 RGB; 257 tokens per frame (1 CLS + 256 patch tokens) |
-| Temporal fusion | 384 → 256 projection; learned temporal embeddings; 2 Transformer layers; 4 attention heads; 1024-dimensional feed-forward layer |
-| Visual resampler | 8 learned queries per frame; 4-head cross-attention; residual feed-forward refinement |
-| Visual projection | LayerNorm + linear projection, 256 → 512 |
-| Language model | `google/flan-t5-small`, `d_model = 512`; frozen by default |
-
-#### V1 architecture
-
-```mermaid
-flowchart TD
-  A["Three ordered RGB frames<br/>Before · During · After"] --> B["DINOv2-Small<br/>frozen visual encoder"]
-  B --> C["Per-frame visual tokens<br/>257 × 384"]
-  C --> D["Input projection<br/>384 → 256"]
-  D --> E["Add learned temporal embeddings"]
-  E --> F["Temporal Transformer<br/>2 layers · 4 heads<br/>FFN dimension 1024"]
-  F --> G["Temporal fusion per spatial-token position<br/>same patch/CLS position attends across frames"]
-  G --> H["Fused token grid<br/>(B, T, 257, 256)"]
-  H --> I["Frame-wise learned-query resampler<br/>8 queries per frame<br/>cross-attention + FFN"]
-  I --> J["Visual projection<br/>LayerNorm + 256 → 512"]
-  J --> K["Visual embeddings<br/>(B, T, 8, 512)"]
-  K --> L["FLAN-T5-Small<br/>inputs_embeds · d_model 512"]
-  L --> M["Frame-level state captions<br/>each frame encoded separately"]
-  K --> N["Concatenate frame tokens<br/>3 × 8 = 24 visual tokens"]
-  N --> O["FLAN-T5-Small"]
-  O --> P["Video-level transition caption"]
-```
-
-The state-caption path selects one frame's eight projected visual tokens at a time. The transition-caption path supplies the projected tokens from all frames as one temporal visual sequence. The same FLAN-T5 decoder is used for both tasks.
-
-**Input and training modes:** the V1 wrapper accepts either raw RGB frames `(B, T, C, H, W)` or cached DINOv2 features `(B, T, N, D)`. The DINOv2-Small encoder is frozen in its implementation; the FLAN-T5-Small decoder is frozen by default.
-
-### V2 — wider DINOv2-Base features and higher-capacity temporal readout
-
-V2 scales up the compact V1 design. It uses **DINOv2-Base** features, a wider and deeper temporal Transformer, twice as many frame-wise resampling queries, a 768-dimensional visual-language interface, and **FLAN-T5-Base** as its default language model.
-
-**Default component configuration from the V2 modules and model-loader defaults:**
-
-| Component | Configuration |
-|---|---|
-| Visual encoder | DINOv2-Base, 768-dimensional features; Small/Base variants are supported; frozen by default |
-| Input representation | 224 × 224 RGB; 257 tokens per frame (1 CLS + 256 patch tokens) |
-| Temporal fusion | 768 → 512 projection; learned temporal embeddings; 3 Transformer layers; 8 attention heads; GELU; 2048-dimensional feed-forward layer |
-| Visual resampler | 16 learned queries per frame; 8-head cross-attention; residual feed-forward refinement |
-| Visual projection | LayerNorm + linear projection, 512 → 768 |
-| Language model | `google/flan-t5-base`, `d_model = 768`; frozen by default; Small/Base variants supported by the decoder |
-
-#### V2 architecture
-
-```mermaid
-flowchart TD
-  A["Three ordered RGB frames<br/>Before · During · After"] --> B["DINOv2-Base<br/>768-dimensional visual encoder"]
-  B --> C["Per-frame visual tokens<br/>257 × 768"]
-  C --> D["Input projection<br/>768 → 512"]
-  D --> E["Add learned temporal embeddings"]
-  E --> F["Temporal Transformer<br/>3 layers · 8 heads<br/>GELU · FFN dimension 2048"]
-  F --> G["Temporal fusion per spatial-token position<br/>same patch/CLS position attends across frames"]
-  G --> H["Fused token grid<br/>(B, T, 257, 512)"]
-  H --> I["Frame-wise learned-query resampler<br/>16 queries per frame<br/>8-head cross-attention + FFN"]
-  I --> J["Visual projection<br/>LayerNorm + 512 → 768"]
-  J --> K["Visual embeddings<br/>(B, T, 16, 768)"]
-  K --> L["FLAN-T5-Base<br/>inputs_embeds · d_model 768"]
-  L --> M["Frame-level state captions<br/>each frame encoded separately"]
-  K --> N["Concatenate frame tokens<br/>3 × 16 = 48 visual tokens"]
-  N --> O["FLAN-T5-Base"]
-  O --> P["Video-level transition caption"]
-```
-
-As in V1, each frame's state representation is read separately for state captioning, while all frame-wise visual tokens are combined for the transition caption. The V2 resampler independently applies the same learned-query readout to each frame; it does not use the later V4 split between state queries and a dedicated global transition-query bank.
-
-**Input and training modes:** the V2 encoder supports cached features and raw images, supports DINOv2-Small or DINOv2-Base, and freezes the visual backbone by default while allowing fine-tuning. The checked-in V2 captioning configuration selects 768-dimensional cached features and FLAN-T5-Base.
-
-**Implementation status:** V2 currently has version-specific encoder, temporal-fusion, visual-resampler, visual-projection, and FLAN-T5 decoder modules, but the `src/sostd/models/v2/` directory does not yet contain an `oscar_lite.py` model wrapper. In addition, the current legacy V1/V2 branch of `ModelLoader` resolves the model wrapper and several modules through root-level `src.sostd.models.*` import paths, whereas the new component files are stored under versioned `v1/` and `v2/` directories. The diagrams above document the architecture represented by the component code; they should not be read as confirmation that V1/V2 end-to-end loading is already wired and tested.
+The next two sections describe the currently maintained model versions. Parameter-count breakdowns for all four model versions are provided separately below.
 
 ### V3 — factorized spatiotemporal fusion
 
@@ -375,46 +297,72 @@ Although the query memory is frame-local at this stage, its tokens already conta
 
 ## Model parameter counts
 
-Parameter counts are reported at two levels because the experiments use cached DINOv2 features during caption training:
+Each model has its own parameter table below. Counts describe the complete raw-frame-to-caption architecture: visual encoder + temporal/readout modules + visual projection + language model. Default freeze settings are shown; changing the encoder or decoder fine-tuning configuration changes the trainable/frozen split, but not the full architecture count.
 
-1. **Full architecture / inference pipeline** counts the DINOv2 visual backbone, the FLAN-T5 language model, and the version-specific trainable modules.
-2. **Caption-training graph** counts the modules instantiated by the V3/V4 training runner. Since `input_mode="cached_features"`, the DINOv2 encoder is replaced by a parameter-free `CachedFeatureEncoder`; DINOv2 runs separately when features are precomputed.
+### V1 — DINOv2-Small + FLAN-T5-Small
 
-### Backbone and trainable-module breakdown
+| Module | Configuration | Parameters | Default status |
+|---|---|---:|---|
+| DINOv2-Small visual encoder | 384 dimensions, 12 Transformer blocks | 22,056,576 | Frozen |
+| Temporal fusion | 384 → 256; 2 Transformer layers, 4 heads | 1,679,360 | Trainable |
+| Visual resampler | 8 learned queries, 4-head cross-attention | 791,808 | Trainable |
+| Visual projection | LayerNorm + 256 → 512 linear projection | 132,096 | Trainable |
+| FLAN-T5-Small | 512-dimensional encoder/decoder, 8 + 8 blocks | 76,961,152 | Frozen by default |
+| **Full V1 architecture** | **All modules above** | **101,620,992** | **Full model** |
+| **Trainable task-specific modules** | Temporal fusion + resampler + projection | **2,603,264** | **Trainable** |
+| **Frozen modules** | DINOv2-Small + FLAN-T5-Small | **99,017,728** | **Frozen by default** |
 
-| Component | V3 parameters | V4 parameters | Training status |
-|---|---:|---:|---|
-| DINOv2-Large visual backbone | 303,228,928 | 303,228,928 | Frozen; external to cached-feature caption training |
-| FLAN-T5-Base | 247,577,856 | 247,577,856 | Frozen |
-| Factorized spatiotemporal encoder | 101,824,512 | Included in V4 temporal module | Trainable |
-| V3 learned visual resampler | 12,628,992 | — | Trainable |
-| V3 visual projection | 789,248 | — | Trainable |
-| V4 hierarchical temporal/query module | — | 168,023,040 | Trainable |
-| V4 visual projection | — | 789,248 | Trainable |
-| V4 305-class object head | — | 683,313 | Trainable |
-| **Version-specific trainable modules** | **115,242,752** | **169,495,601** | **Trainable** |
+### V2 — DINOv2-Base + FLAN-T5-Base
 
-The V4 temporal/query module includes the four factorized spatiotemporal blocks, learned frame embeddings, frame-local state queries, video-level transition queries, and the two query cross-attention blocks on each path.
+| Module | Configuration | Parameters | Default status |
+|---|---|---:|---|
+| DINOv2-Base visual encoder | 768 dimensions, 12 Transformer blocks | 86,580,480 | Frozen by default |
+| Temporal fusion | 768 → 512; 3 Transformer layers, 8 heads | 9,853,440 | Trainable |
+| Visual resampler | 16 learned queries, 8-head cross-attention | 3,160,576 | Trainable |
+| Visual projection | LayerNorm + 512 → 768 linear projection | 395,008 | Trainable |
+| FLAN-T5-Base | 768-dimensional encoder/decoder, 12 + 12 blocks | 247,577,856 | Frozen by default |
+| **Full V2 architecture** | **All modules above** | **347,567,360** | **Full model** |
+| **Trainable task-specific modules** | Temporal fusion + resampler + projection | **13,409,024** | **Trainable** |
+| **Frozen modules** | DINOv2-Base + FLAN-T5-Base | **334,158,336** | **Frozen by default** |
 
-### Total parameter comparison
+### V3 — DINOv2-Large + FLAN-T5-Base
 
-| Model | Full architecture / inference pipeline | Caption-training graph with cached features | Trainable during caption training | Frozen in caption-training graph | Trainable share of caption-training graph |
-|---|---:|---:|---:|---:|
-| **V3** | **666,049,536 (~666.05M)** | 362,820,608 (~362.82M) | 115,242,752 (~115.24M) | 247,577,856 (~247.58M) | **31.76%** |
-| **V4** | **720,302,385 (~720.30M)** | 417,073,457 (~417.07M) | 169,495,601 (~169.50M) | 247,577,856 (~247.58M) | **40.64%** |
+| Module | Configuration | Parameters | Default status |
+|---|---|---:|---|
+| DINOv2-Large visual encoder | 1024 dimensions, 24 Transformer blocks | 304,368,640 | Frozen; cached during caption training |
+| Factorized spatiotemporal fusion | 4 blocks; spatial + temporal attention; 16 heads | 101,824,512 | Trainable |
+| Learned visual resampler | 32 queries per frame; cross-attention + FFN | 12,628,992 | Trainable |
+| Visual projection | LayerNorm + 1024 → 768 linear projection | 789,248 | Trainable |
+| FLAN-T5-Base | 768-dimensional encoder/decoder, 12 + 12 blocks | 247,577,856 | Frozen |
+| **Full V3 architecture** | **All modules above** | **667,189,248** | **Full model** |
+| **Caption-training graph** | **Cached-feature encoder + V3 trainable modules + FLAN-T5-Base** | **362,820,608** | **DINOv2 excluded from this graph** |
+| **Trainable task-specific modules** | Fusion + resampler + projection | **115,242,752** | **Trainable** |
+| **Frozen modules in caption-training graph** | FLAN-T5-Base | **247,577,856** | **Frozen** |
+| **Frozen modules in full architecture** | DINOv2-Large + FLAN-T5-Base | **551,946,496** | **Frozen** |
 
-```python
-# Counts in the cached-feature caption-training graph
-total_parameters = sum(p.numel() for p in model.parameters())
-trainable_parameters = sum(
-    p.numel() for p in model.parameters() if p.requires_grad
-)
-frozen_parameters = total_parameters - trainable_parameters
-```
+### V4 — DINOv2-Large + FLAN-T5-Base
 
-**Interpretation:** V4 adds approximately 54.25M trainable parameters relative to V3. Most of this increase comes from V4's separate state-query and transition-query pathways. The counts exclude tokenizer vocabulary objects, optimizer state, gradients, and the dataset/feature cache itself.
+| Module | Configuration | Parameters | Default status |
+|---|---|---:|---|
+| DINOv2-Large visual encoder | 1024 dimensions, 24 Transformer blocks | 304,368,640 | Frozen; cached during caption training |
+| Hierarchical temporal/query module | 4 factorized blocks + 2 state-query blocks + 2 transition-query blocks; 16 state queries/frame; 32 transition queries/video | 168,023,040 | Trainable |
+| Shared visual projection | LayerNorm + 1024 → 768 linear projection | 789,248 | Trainable |
+| Object classification head | 305 classes | 683,313 | Trainable |
+| FLAN-T5-Base | 768-dimensional encoder/decoder, 12 + 12 blocks | 247,577,856 | Frozen |
+| **Full V4 architecture** | **All modules above** | **721,442,097** | **Full model** |
+| **Caption-training graph** | **Cached-feature encoder + V4 trainable modules + FLAN-T5-Base** | **417,073,457** | **DINOv2 excluded from this graph** |
+| **Trainable task-specific modules** | Temporal/query module + projection + object head | **169,495,601** | **Trainable** |
+| **Frozen modules in caption-training graph** | FLAN-T5-Base | **247,577,856** | **Frozen** |
+| **Frozen modules in full architecture** | DINOv2-Large + FLAN-T5-Base | **551,946,496** | **Frozen** |
 
-**Counting note:** the version-specific module totals are calculated from the configured dimensions in the repository (1024 hidden units, four spatiotemporal blocks, 16 heads, and the configured query/class counts). DINOv2-Large is counted using the Hugging Face `Dinov2Model` topology/configuration (24 layers, hidden size 1024, LayerScale and mask-token embeddings); FLAN-T5-Base uses 247,577,856 parameters. The DINOv2 count is therefore tied to the Transformers model implementation/configuration and may differ slightly with a different checkpoint implementation. See the [DINOv2 model config](https://huggingface.co/facebook/dinov2-large/blob/main/config.json), [Transformers DINOv2 implementation](https://github.com/huggingface/transformers/blob/main/src/transformers/models/dinov2/modeling_dinov2.py), and [FLAN-T5-Base checkpoint](https://huggingface.co/google/flan-t5-base).
+### Parameter-counting methodology and caveats
+
+- **DINOv2 positional embeddings:** the Hugging Face DINOv2 Small/Base/Large configs use a native 518 × 518 image size with 14 × 14 patches (37 × 37 patch positions). The project encoder resizes runtime frames to 224 × 224 and the model interpolates positional embeddings for that input, but the learned checkpoint position-embedding table remains at its configured size. Parameter totals therefore include that native learned table rather than counting only 257 positions.
+- **DINOv2 count basis:** counts use the Hugging Face `Dinov2Model` topology, including patch projection, CLS/mask/position embeddings, Transformer blocks, LayerScale parameters, and final normalization. No optional register tokens are included.
+- **FLAN-T5 count basis:** counts use the Hugging Face checkpoint configurations and `T5ForConditionalGeneration` topology, including encoder, decoder, shared token embedding, and the untied language-model head. FLAN-T5-Small has 76,961,152 parameters; FLAN-T5-Base has 247,577,856.
+- **Project modules:** V1/V2/V3/V4 task-specific module counts are calculated from the declared PyTorch layer dimensions, query counts, and class counts in their respective implementations.
+- **Training/evaluation support:** V1 and V2 are legacy implementations and do not have supported training/evaluation workflows in the current repository. Their tables therefore report full architecture counts, not current training-graph counts. V3/V4 caption training uses cached DINOv2 features, so the DINOv2 encoder is counted in each full architecture but is outside the caption-training graph.
+- Counts exclude tokenizer objects, optimizer state, gradients, activations, datasets, and cached feature files. These are architecture parameter counts derived from the checkpoint configurations and module definitions; they are not GPU-memory or training-state estimates.
 
 ## Mathematical formulation
 
